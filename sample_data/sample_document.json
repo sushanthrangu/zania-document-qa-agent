@@ -1,0 +1,21 @@
+{
+  "company": "ExampleCloud",
+  "infrastructure": {
+    "cloud_provider": "Google Cloud Platform",
+    "primary_region": "us-central1",
+    "backup_region": "us-east1"
+  },
+  "security": {
+    "encryption_at_rest": "AES-256",
+    "encryption_in_transit": "TLS 1.2 or higher"
+  },
+  "monitoring": {
+    "application_performance_monitoring": true,
+    "uptime_monitoring": true,
+    "cpu_monitoring": true,
+    "memory_monitoring": true
+  },
+  "incident_response": {
+    "client_notification": "Affected clients are notified without undue delay after a confirmed security incident."
+  }
+}
