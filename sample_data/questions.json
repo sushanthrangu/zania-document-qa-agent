@@ -1,0 +1,16 @@
+{
+  "questions": [
+    {
+      "id": 1,
+      "question": "Which cloud providers do you rely on?"
+    },
+    {
+      "id": 2,
+      "question": "What monitoring capabilities are documented?"
+    },
+    {
+      "id": 3,
+      "question": "What backup or disaster recovery capabilities are described?"
+    }
+  ]
+}
