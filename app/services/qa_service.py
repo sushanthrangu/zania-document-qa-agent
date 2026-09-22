@@ -30,6 +30,7 @@ def get_chat_model() -> ChatOpenAI:
         model=settings.openai_chat_model,
         api_key=settings.openai_api_key,
         temperature=0,
+        timeout=settings.openai_timeout_seconds,
     )
 
 
@@ -202,6 +203,62 @@ def generate_answer(
     )
 
     response = structured_model.invoke(messages)
+
+    answer = response.answer.strip()
+
+    if not answer:
+        return GroundedAnswer(
+            answer="Data-Not-Found",
+            confidence="low",
+            evidence_indices=[],
+        )
+
+    if answer.lower() == "data-not-found":
+        return GroundedAnswer(
+            answer="Data-Not-Found",
+            confidence="low",
+            evidence_indices=[],
+        )
+
+    return GroundedAnswer(
+        answer=answer,
+        confidence=response.confidence,
+        evidence_indices=response.evidence_indices,
+    )
+
+
+async def generate_answer_async(
+    question: str,
+    documents: list[Document],
+) -> GroundedAnswer:
+    """Generate a grounded answer asynchronously from retrieved context."""
+
+    if not question or not question.strip():
+        raise ValueError(
+            "Question cannot be empty."
+        )
+
+    if not documents:
+        return GroundedAnswer(
+            answer="Data-Not-Found",
+            confidence="low",
+            evidence_indices=[],
+        )
+
+    context = format_context(documents)
+
+    messages = QA_PROMPT.format_messages(
+        context=context,
+        question=question.strip(),
+    )
+
+    model = get_chat_model()
+
+    structured_model = model.with_structured_output(
+        GroundedAnswer
+    )
+
+    response = await structured_model.ainvoke(messages)
 
     answer = response.answer.strip()
 

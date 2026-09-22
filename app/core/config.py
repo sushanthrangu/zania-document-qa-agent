@@ -12,7 +12,14 @@ class Settings(BaseSettings):
 
     chunk_size: int = 1000
     chunk_overlap: int = 150
-    top_k: int = 4
+    top_k: int = 8
+
+    max_questions: int = 50
+    max_questions_file_size_mb: int = 1
+    max_document_file_size_mb: int = 20
+    max_concurrent_questions: int = 5
+
+    openai_timeout_seconds: float = 60.0
 
     model_config = SettingsConfigDict(
         env_file=".env",

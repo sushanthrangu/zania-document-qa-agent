@@ -29,6 +29,11 @@ It retrieves relevant evidence from the source document and uses an OpenAI langu
 - FastAPI REST API
 - Streamlit user interface
 - Docker support
+- Bounded concurrent question processing
+- Configurable question-count and upload-size limits
+- OpenAI request timeout protection
+- Structured JSON request logging
+- Request IDs and response latency tracking
 - Automated test suite with mocked LLM calls
 
 ---
@@ -244,12 +249,20 @@ Example:
 
 ```env
 OPENAI_API_KEY=your_openai_api_key_here
+
 OPENAI_CHAT_MODEL=gpt-4o-mini
 OPENAI_EMBEDDING_MODEL=text-embedding-3-small
 
 CHUNK_SIZE=1000
 CHUNK_OVERLAP=150
 TOP_K=8
+
+MAX_QUESTIONS=50
+MAX_QUESTIONS_FILE_SIZE_MB=1
+MAX_DOCUMENT_FILE_SIZE_MB=20
+MAX_CONCURRENT_QUESTIONS=5
+
+OPENAI_TIMEOUT_SECONDS=60
 ```
 
 Never commit `.env` or API keys to source control.
@@ -508,7 +521,7 @@ pytest -v
 Current test result:
 
 ```text
-39 passed
+43 passed, 7 warnings
 ```
 
 The tests cover:
@@ -528,6 +541,10 @@ The tests cover:
 - QA endpoint validation
 - Successful API orchestration
 - Error handling
+- Maximum question-count validation
+- Questions/document upload-size validation
+- Concurrent multi-question processing with result-order preservation
+- API robustness controls
 
 LLM behavior is mocked in automated tests, so running the test suite does not require consuming OpenAI API credits.
 
@@ -686,19 +703,48 @@ Some complex or multi-part questions may benefit from:
 
 ### Request Processing
 
-Embedding and LLM operations are external network calls. A high-throughput production deployment could use additional concurrency controls, worker processes, background processing, or asynchronous integrations.
+Questions within a request are processed concurrently using asynchronous execution.
+
+The application:
+
+- Uses `asyncio.gather()` to process multiple questions concurrently.
+- Uses an `asyncio.Semaphore` to bound concurrency.
+- Processes at most 5 questions concurrently by default.
+- Offloads synchronous FAISS retrieval work using `asyncio.to_thread()`.
+- Uses asynchronous LLM calls for answer generation.
+- Preserves the original question order in the final response.
+- Applies configurable OpenAI request timeouts to embedding and chat-model operations.
+
+The concurrency limit can be configured with:
+
+```text
+MAX_CONCURRENT_QUESTIONS=5
+```
+
+The OpenAI timeout can be configured with:
+
+```text
+OPENAI_TIMEOUT_SECONDS=60
+```
+
+These controls improve throughput while preventing unbounded concurrent model requests.
+
 
 ### Production API Controls
 
-The assignment implementation does not currently include:
+The API includes configurable safeguards for request size and workload:
 
-- Authentication
-- Rate limiting
-- Explicit upload-size limits
-- Persistent document storage
+- Maximum questions per request: **50**
+- Maximum questions JSON file size: **1 MB**
+- Maximum document file size: **20 MB**
+- Maximum concurrent questions: **5**
+- OpenAI request timeout: **60 seconds**
 
-These would be important for an internet-facing production deployment.
+Requests that exceed the configured question-count or upload-size limits are rejected with HTTP `413` responses and clear error messages.
 
+These limits can be configured through environment variables without changing application code.
+
+Authentication and rate limiting are not included in this assignment implementation and would be appropriate additions for a public internet-facing deployment.
 ---
 
 ## Future Improvements
@@ -708,15 +754,53 @@ Potential improvements include:
 - OCR support for scanned PDFs
 - Persistent vector indexes
 - Document fingerprinting and index caching
-- Hybrid retrieval
+- Hybrid lexical + semantic retrieval
 - Query decomposition for complex questions
 - Cross-encoder reranking
 - Retrieval evaluation metrics
-- Batch/parallel question processing
-- File-size limits
-- Authentication and rate limiting
-- Observability and request tracing
+- Authentication and authorization
+- API rate limiting
 - Persistent answer history
+- Distributed task processing for larger workloads
+- Persistent metrics dashboards and distributed tracing
+
+---
+## Observability
+
+The FastAPI application includes structured request-level observability using Python's standard logging library.
+
+For every HTTP request, the middleware records:
+
+- UTC timestamp
+- Log level
+- Logger name
+- Request ID
+- HTTP method
+- Request path
+- Response status code
+- Request duration in milliseconds
+
+Logs are emitted as structured JSON, making them suitable for ingestion by centralized logging platforms.
+
+Example:
+
+```json
+{
+  "timestamp": "2026-09-22T14:34:25.203734+00:00",
+  "level": "INFO",
+  "logger": "app.main",
+  "message": "request_completed",
+  "request_id": "f31b019e-8ce2-4061-a881-68b6163ba1ea",
+  "method": "GET",
+  "path": "/health",
+  "status_code": 200,
+  "duration_ms": 2.02
+}
+```
+
+Each response also includes an `X-Request-ID` header for request correlation. If the client supplies an `X-Request-ID`, the application preserves it; otherwise, a UUID is generated.
+
+Request bodies, uploaded document contents, questions, answers, and API keys are not intentionally included in request logs.
 
 ---
 
