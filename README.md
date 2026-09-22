@@ -202,8 +202,8 @@ document-qa-agent/
 ### 1. Clone the repository
 
 ```bash
-git clone <repository-url>
-cd document-qa-agent
+git clone https://github.com/sushanthrangu/zania-document-qa-agent.git
+cd zania-document-qa-agent
 ```
 
 ### 2. Create a virtual environment
